@@ -45,6 +45,47 @@ from Xlib.protocol import rq
 DBusGMainLoop(set_as_default=True) # for async calls
 BUS = dbus.SessionBus()
 
+def find_common_prefix(lst):
+    if not lst: return ""
+    for pos in range(len(lst[0])+1):
+        current = lst[0][:pos]
+        if not all([x.startswith(current) for x in lst]):
+            return lst[0][:pos-1]
+    return lst[0]
+
+def find_common_suffix(lst):
+    if not lst: return ""
+    for pos in range(1, len(lst[0])+1):
+        current = lst[0][-pos:]
+        if not all([x.endswith(current) for x in lst]):
+            if pos == 1: return ""
+            return lst[0][-pos+1:]
+    return lst[0]
+
+def test_find_common_functions():
+    tests_prefix = [
+        (["abc", "abd", "abe", "abcdefgh"], "ab"),
+        (["abc", "abd", "abe", "vabcdefgh"], ""),
+        (["abcdefghi", "abd", "abe", "abcdefgh"], "ab"),
+        ([], ""),
+        (["abc"], "abc"),
+        (["abc", "abc", "abc"], "abc")
+    ]
+    for lst, expected in tests_prefix:
+        p = find_common_prefix(lst)
+        assert p == expected, f"find_common_prefix({lst}) should be {expected}, was {p}"
+    tests_suffix = [
+        (["xyz", "ayz", "byz"], "yz"),
+        (["xyz", "xyz", "xyz"], "xyz"),
+        (["xyz", "ayzs", "byz"], ""),
+        ([], ""),
+        (["xyz"], "xyz"),
+        (["xyzzzzzzzzz", "ayz", "byz"], "z")
+    ]
+    for lst, expected in tests_suffix:
+        p = find_common_suffix(lst)
+        assert p == expected, f"find_common_suffix({lst}) should be {expected}, was {p}"
+
 # workaround for an old version python-xlib bug, see Issue 113
 try:
     XDisplay = display.Display()
@@ -643,6 +684,8 @@ class Globals(GObject.GObject):
                                   None,()),
         "keep-previews-changed": (GObject.SignalFlags.RUN_FIRST,
                                  None,()),
+        "trim-previews-changed": (GObject.SignalFlags.RUN_FIRST,
+                                 None,()),
         "preview-size-changed": (GObject.SignalFlags.RUN_FIRST,
                                  None,()),
         "window-title-width-changed": (GObject.SignalFlags.RUN_FIRST,
@@ -694,6 +737,7 @@ class Globals(GObject.GObject):
           "preview": True,
           "preview_size": 150,
           "preview_keep": False,
+          "preview_trim": False,
           "old_menu": False,
           "show_close_button": True,
           "locked_list_in_menu": True,
@@ -925,6 +969,8 @@ class Globals(GObject.GObject):
             self.emit("preview-size-changed")
         elif "preview_keep" == key:
             self.emit("keep-previews-changed")
+        elif "preview_trim" == key:
+            self.emit("trim-previews-changed")
         elif "window_title_width" == key:
             self.emit("window-title-width-changed")
         elif "groupbutton_show_tooltip" == key:

@@ -116,6 +116,14 @@
       </description>
     </key>
 
+    <key name='preview-trim' type='b'>
+      <default>false</default>
+      <summary>Smart title trimming</summary>
+      <description>
+        Remove common elements in a list of window titles
+      </description>
+    </key>
+
     <key name='old-menu' type='b'>
       <default>false</default>
       <summary>Use the old gtk style menu</summary>

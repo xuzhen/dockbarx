@@ -919,6 +919,9 @@ class PrefDialog():
         self.preview_keep_cb = Gtk.CheckButton.new_with_label(_("Keep previews for minimized windows (experimental)"))
         self.preview_keep_cb.connect("toggled", self.__checkbutton_toggled, "preview_keep")
         vbox.pack_start(self.preview_keep_cb, False, True, 0)
+        self.preview_trim_cb = Gtk.CheckButton.new_with_label(_("Smart title trimming"))
+        self.preview_trim_cb.connect("toggled", self.__checkbutton_toggled, "preview_trim")
+        vbox.pack_start(self.preview_trim_cb, False, True, 0)
         popup_box.pack_start(vbox, False, True, 5)
 
         self.preview_size_spinbox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0)
@@ -1769,6 +1772,8 @@ class PrefDialog():
         self.preview_cb.set_active(self.globals.settings["preview"])
         self.preview_keep_cb.set_active(self.globals.settings["preview_keep"])
         self.preview_keep_cb.set_sensitive(self.globals.settings["preview"])
+        self.preview_trim_cb.set_active(self.globals.settings["preview_trim"])
+        self.preview_trim_cb.set_sensitive(self.globals.settings["preview"])
         self.preview_size_spin.set_value(self.globals.settings["preview_size"])
         self.preview_size_spin.set_sensitive(self.globals.settings["preview"])
         self.window_title_width_spin.set_value(

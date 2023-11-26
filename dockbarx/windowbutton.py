@@ -338,6 +338,9 @@ class WindowItem(CairoButton):
         self.press_sid = None
         self.pressed = False
 
+        self.common_prefix = ""
+        self.common_suffix = ""
+
         self.area.set_needs_attention(window.wnck.needs_attention())
 
         self.close_button = CairoCloseButton()
@@ -409,6 +412,8 @@ class WindowItem(CairoButton):
                                     self.__update_label))
         self.globals_events.append(self.globals.connect("keep-previews-changed",
                                     self.__clear_saved_preview))
+        self.globals_events.append(self.globals.connect("trim-previews-changed",
+                                    self.__clear_saved_preview))
         self.globals_events.append(self.globals.connect("show-previews-changed",
                                     self.__clear_saved_preview))
 
@@ -452,6 +457,10 @@ class WindowItem(CairoButton):
         window = self.window_r()
         group = self.group_r()
         text = escape(str(window.wnck.get_name()))
+        if text.startswith(self.common_prefix) and self.common_prefix:
+            text = "…" + text[len(self.common_prefix):]
+        if text.endswith(self.common_suffix) and self.common_suffix:
+            text = text[:-len(self.common_suffix)] + "…"
         if window.wnck.is_minimized():
             color = self.globals.colors["color4"]
         else:

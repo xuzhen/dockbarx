@@ -2511,6 +2511,33 @@ class WindowList(Gtk.Box):
             self.globals.disconnect(self.globals_events.pop())
         Gtk.Box.destroy(self, *args, **kvargs)
 
+    def __recalculate_item_titles(self):
+        """Implements 'smart title trimming'
+        That is: in a window list with titles
+            stuart@machine: ~ - Terminal
+            stuart@machine: ~/Pictures - Terminal
+            stuart@machine: ~/Documents - Terminal
+            stuart@machine: ~/.local/share - Terminal
+        it will remove common prefixes and suffixes, resulting in
+            … ~ …
+            … ~/Pictures …
+            … ~/Documents …
+            … ~/.local/share …
+        """
+        if not self.globals.settings["preview_trim"]: return
+        group = self.group_r()
+        if not group: return
+        window_names = [str(i.item.window_r().wnck.get_name()) for i in group]
+        common_prefix = find_common_prefix(window_names)
+        common_suffix = find_common_suffix(window_names)
+        # Don't strip off short prefixes
+        if len(common_prefix) < 4: common_prefix = ""
+        if len(common_suffix) < 4: common_suffix = ""
+        for i in group:
+            i.item.common_prefix = common_prefix
+            i.item.common_suffix = common_suffix
+            i.item.name_changed()
+
     def show_all(self):
         group = self.group_r()
         for window in group:
@@ -2546,12 +2573,14 @@ class WindowList(Gtk.Box):
             return False
 
     def add_item(self, item):
+        self.__recalculate_item_titles()
         if self.show_previews:
             item.update_preview_size()
             item.set_show_preview(self.show_previews)
         self.window_box.pack_start(item, True, True, 0)
 
     def reorder_item(self, index, item):
+        self.__recalculate_item_titles()
         self.window_box.reorder_child(item, index)
 
     def shrink_size(self, locked_popup=False):
@@ -2597,6 +2626,7 @@ class WindowList(Gtk.Box):
         self.set_show_previews(self.globals.settings["preview"])
 
     def __rebuild_list(self, locked_popup_list=False):
+        self.__recalculate_item_titles()
         oldbox = self.window_box
         if self.mini_mode:
             self.window_box = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 2)
@@ -2670,6 +2700,7 @@ class WindowList(Gtk.Box):
 
     #### Mini list
     def apply_mini_mode(self):
+        self.__recalculate_item_titles()
         group = self.group_r()
         self.set_spacing(0)
         self.title.set_no_show_all(True)
@@ -2681,6 +2712,7 @@ class WindowList(Gtk.Box):
         self.__rebuild_list(True)
 
     def apply_normal_mode(self):
+        self.__recalculate_item_titles()
         self.set_spacing(2)
         self.title.set_no_show_all(False)
         self.title.show()
@@ -3049,4 +3081,5 @@ class GroupMenu(GObject.GObject):
 
     def __on_submenu_toggled(self, *args):
         self.emit("menu-resized")
+
 
