@@ -583,17 +583,13 @@ class DockX(CairoDockX):
         size = max(db_size, int(db_size * rel_size / 100))
         o = self.globals.settings["dock/offset"]
         if pos == "left":
-            x,y, w, h = (l, t + o, size, sh - t - b - o)
-            strut = [x + w, 0, 0, 0, y, y + h - 1, 0, 0, 0, 0, 0, 0]
+            x, y, w, h = (l, t + o, size, sh - t - b - o)
         elif pos == "right":
-            x,y, w, h = (sw - size - r, t + o, size, sh - t - b - o)
-            strut = [0, sw - x, 0, 0, 0, 0, y, y + h - 1, 0, 0, 0, 0]
+            x, y, w, h = (sw - size - r, t + o, size, sh - t - b - o)
         elif pos == "top":
-            x,y, w, h = (l + o, t, sw - l - r - o, size)
-            strut = [0, 0, y + h, 0, 0, 0, 0, 0, x, x + w - 1, 0, 0]
+            x, y, w, h = (l + o, t, sw - l - r - o, size)
         else:
-            x,y, w, h = (l + o, sh - size - b, sw - l - r - o, size)
-            strut = [0, 0, 0, sh - y, 0, 0, 0, 0, 0, 0, x, x + w - 1]
+            x, y, w, h = (l + o, sh - size - b, sw - l - r - o, size)
         if (centered or cornered) and pos in ("left", "right"):
             self.set_size_request(w, -1)
         elif (centered or cornered):
@@ -603,10 +599,10 @@ class DockX(CairoDockX):
         self.__set_dock_strut(x, y, w, h)
         if centered and pos in ("left", "right"):
             a = self.get_allocation()
-            self.move(x, my + mh // 2 - a.height // 2)
+            self.move(x, my + (mh - a.height) // 2)
         elif centered:
             a = self.get_allocation()
-            self.move(mx + mw // 2 - a.width // 2, y)
+            self.move(mx + (mw - a.width) // 2, y)
         else:
             self.move(x, y)
             self.old_x = x
@@ -795,12 +791,10 @@ class DockX(CairoDockX):
             topw.delete_property(XDisplay.get_atom("_NET_WM_STRUT"))
             topw.delete_property(XDisplay.get_atom("_NET_WM_STRUT_PARTIAL"))
             return
-        mr = self.get_monitor_geometry()
         s = self.get_screen()
         sr = self.get_screen_geometry()
         sw = sr.width
         sh = sr.height
-        mx, my, mw, mh = mr.x, mr.y, mr.width, mr.height
         if self.globals.settings["dock/position"] == "left":
             strut = [x + w, 0, 0, 0, y, y + h - 1, 0, 0, 0, 0, 0, 0]
         elif self.globals.settings["dock/position"] == "right":
@@ -913,16 +907,16 @@ class DockX(CairoDockX):
             mx, my, mw, mh = mr.x, mr.y, mr.width, mr.height
             if self.globals.settings["dock/position"] == "left":
                 x = mx
-                y = my + mh // 2 - h // 2
+                y = my + (mh - h) // 2
             elif self.globals.settings["dock/position"] == "right":
-                x = mx + mw - w
-                y = my + mh // 2 - h // 2
+                x = mx + (mw - w)
+                y = my + (mh - h) // 2
             elif self.globals.settings["dock/position"] == "top":
-                x = mx + mw // 2 - w // 2
+                x = mx + (mw - w) // 2
                 y = my
             else:
-                x = mx + mw // 2 - w // 2
-                y = my + mh - h
+                x = mx + (mw - w) // 2
+                y = my + (mh - h) 
         else:
             x = self.old_x
             y = self.old_y
