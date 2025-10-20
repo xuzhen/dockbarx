@@ -793,16 +793,18 @@ class DockX(CairoDockX):
             return
         s = self.get_screen()
         sr = self.get_screen_geometry()
+        sf = self.get_scale_factor()
         sw = sr.width
         sh = sr.height
+        # [ left, right, top, bottom, left_start_y, left_end_y, right_start_y, right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x ]
         if self.globals.settings["dock/position"] == "left":
-            strut = [x + w, 0, 0, 0, y, y + h - 1, 0, 0, 0, 0, 0, 0]
+            strut = [(x + w) * sf, 0, 0, 0, y * sf, (y + h - 1) * sf, 0, 0, 0, 0, 0, 0]
         elif self.globals.settings["dock/position"] == "right":
-            strut = [0, sw - x, 0, 0, 0, 0, y, y + h - 1, 0, 0, 0, 0]
+            strut = [0, (sw - x) * sf, 0, 0, 0, 0, y * sf, (y + h - 1) * sf, 0, 0, 0, 0]
         elif self.globals.settings["dock/position"] == "top":
-            strut = [0, 0, y + h, 0, 0, 0, 0, 0, x, x + w - 1, 0, 0]
+            strut = [0, 0, (y + h) * sf, 0, 0, 0, 0, 0, x * sf, (x + w - 1) * sf, 0, 0]
         else:
-            strut = [0, 0, 0, sh - y, 0, 0, 0, 0, 0, 0, x, x + w - 1]
+            strut = [0, 0, 0, (sh - y) * sf, 0, 0, 0, 0, 0, 0, x * sf, (x + w - 1) * sf]
         strut = list(map(lambda e: 0 if e < 0 else e, strut))
         topw = XDisplay.create_resource_object('window',
                                 self.get_toplevel().get_window().get_xid())
@@ -823,8 +825,10 @@ class DockX(CairoDockX):
         mr = self.get_monitor_geometry()
         mx, my, mw, mh = mr.x, mr.y, mr.width, mr.height
         sr = self.get_screen_geometry()
+        sf = self.get_scale_factor()
         sw = sr.width
         sh = sr.height
+        # [ left, right, top, bottom ]
         strut = [mx, sw - (mx + mw), my,  sh - (my + mh)]
         strut_atom = XDisplay.get_atom('_NET_WM_STRUT')
         strut_partial_atom = XDisplay.get_atom('_NET_WM_STRUT_PARTIAL')
@@ -840,6 +844,9 @@ class DockX(CairoDockX):
                 cl = w.get_wm_class()
                 if cl and cl[0] == "dockx":
                     continue
+                for i in range(12):
+                    prop1.value[i] = prop1.value[i] // sf
+                # [ left, right, top, bottom, left_start_y, left_end_y, right_start_y, right_end_y, top_start_x, top_end_x, bottom_start_x, bottom_end_x ]
                 if self.globals.settings["dock/position"] == "left":
                     if prop1.value[6] < my + mh and \
                        prop1.value[7] >= my:
@@ -888,7 +895,7 @@ class DockX(CairoDockX):
                 if cl and cl[0] == "dockx":
                     continue
                 for i in range(4):
-                    strut[i] = max(strut[i], prop2.value[i])
+                    strut[i] = max(strut[i], prop2.value[i] // sf)
         return strut
 
     def on_size_allocate(self, widget, allocation):
