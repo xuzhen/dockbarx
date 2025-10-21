@@ -1517,7 +1517,7 @@ class DockXApp(Gtk.Application):
         iface = info.lookup_interface("org.dockbar.DockX")
         dbus = self.get_dbus_connection()
         dbus_path = self.get_dbus_object_path()
-        if dbus.register_object_with_closures2 is not None:
+        if hasattr(dbus, "register_object_with_closures2"):
             dbus.register_object_with_closures2(dbus_path, iface, self.dbus_method_call, None, None);
         else:
             dbus.register_object(dbus_path, iface, self.dbus_method_call, None, None);
