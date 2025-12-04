@@ -808,11 +808,13 @@ class CairoButton(Gtk.EventBox):
         self.connect("button-press-event", self.on_button_press_event)
 
     def on_leave_notify_event(self, *args):
+        self.area.mouseover = False
         if self.mousedown:
             self.area.set_pressed_down(False)
         self.area.queue_draw()
 
     def on_enter_notify_event(self, *args):
+        self.area.mouseover = True
         if self.mousedown:
             self.area.set_pressed_down(True)
         self.area.queue_draw()
@@ -882,6 +884,7 @@ class CairoArea(Gtk.Bin):
         self.active_window = False
         self.needs_attention = False
         self.minimized = False
+        self.mouseover = False
         if text:
             self.label = Gtk.Label()
             self.add(self.label)
@@ -926,14 +929,11 @@ class CairoArea(Gtk.Bin):
 
     def on_draw(self, widget, ctx):
         a = self.get_allocation()
-        mx , my = self.get_pointer()
-        highlighted = self.highlighted or \
-                      (mx >= 0 and mx < a.width and my >= 0 and my < a.height)
         if self.needs_attention:
             self.draw_type_frame(ctx, 0, 0, a.width, a.height, "needs_attention_item")
         if self.active_window:
             self.draw_type_frame(ctx, 0, 0, a.width, a.height, "active_item")
-        if highlighted:
+        if self.mouseover or self.highlighted:
             self.draw_frame(ctx, 0, 0, a.width, a.height)
         return
 
@@ -1023,8 +1023,7 @@ class CairoArea(Gtk.Bin):
         mx,my = self.get_pointer()
         a = self.get_allocation()
 
-        if mx >= 0 and mx < a.width \
-        and my >= 0 and my < a.height:
+        if self.mouseover:
             # Mouse pointer is inside the "rectangle"
             # but check if it's still outside the rounded corners
             x = None
