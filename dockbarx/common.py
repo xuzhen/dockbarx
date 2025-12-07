@@ -24,6 +24,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
+from gi.repository import GdkPixbuf
 from gi.repository import GObject
 from gi.repository import Gio
 from gi.repository import GLib
@@ -35,7 +36,9 @@ import locale
 from .log import logger
 import sys
 import struct
+import Xlib
 from Xlib import display, X
+from PIL import Image
 
 import _thread
 from Xlib.ext import record
@@ -414,6 +417,58 @@ class XEventObserver(GObject.GObject):
             if event.atom in self.atoms:
                 # emit signals in main thread
                 GLib.idle_add(lambda: self.emit("window-update", event.window.id))
+
+
+class XWindowPixbuf():
+    def __init__(self, xid):
+        self.xid = xid
+
+    def get_snapshot(self):
+        try:
+            xwin = XDisplay.create_resource_object('window', self.xid)
+            # Wnck.Window.is_minimized() may not work with some wine program windows
+            if xwin.get_wm_state().state != Xlib.Xutil.NormalState:
+                return None
+            xwin.composite_redirect_window(Xlib.ext.composite.RedirectAutomatic)
+            pixmap = xwin.composite_name_window_pixmap()
+            xwin.composite_unredirect_window(Xlib.ext.composite.RedirectAutomatic)
+            geo = xwin.get_geometry()
+            image_object = pixmap.get_image(0, 0, geo.width, geo.height, Xlib.X.ZPixmap, 0xffffffff)
+            pixmap.free()
+        except:
+            return None
+        return self._pixmap2pixbuf(image_object.data, (geo.width, geo.height))
+
+    def get_icon(self, size):
+        xatom = XDisplay.get_atom('_NET_WM_ICON')
+        win = XDisplay.create_resource_object('window', self.xid)
+        prop = win.get_full_property(xatom, Xlib.Xatom.CARDINAL)
+        if prop and prop.format == 32:
+            v = prop.value
+            i = 0
+            l = len(v)
+            min_d = None
+            data = None
+            actual_size = None
+            while i < l:
+                w = v[i]
+                h = v[i + 1]
+                d = abs(w * h - size * size)
+                if min_d is None or d < min_d or (d == min_d and w * h > size * size):
+                    min_d = d
+                    data = v[i + 2 : i + 2 + w * h]
+                    actual_size = (w, h)
+                i += 2 + w * h
+            if data is not None:
+                return self._pixmap2pixbuf(data, actual_size)
+        return None
+
+    def _pixmap2pixbuf(self, data, size):
+        im = Image.frombuffer("RGBA", size, data, "raw", "BGRA")
+        data = GLib.Bytes.new(im.tobytes())
+        return GdkPixbuf.Pixbuf.new_from_bytes(data, GdkPixbuf.Colorspace.RGB, True, 8, size[0], size[1], size[0] * 4)
+
+
 
 class Opacify():
     def __init__(self):

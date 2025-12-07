@@ -22,6 +22,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GdkX11
+from gi.repository import GdkPixbuf
 from math import pi, tan
 from xml.sax.saxutils import escape
 from gi.repository import GObject
@@ -30,8 +31,10 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import PangoCairo
 from gi.repository import Pango
 import cairo
+import weakref
 
 from .common import Globals, connect, disconnect
+from .common import XWindowPixbuf
 from .theme import PopupStyle
 from .log import logger
 
@@ -39,8 +42,9 @@ from .log import logger
 
 class CairoAppButton(Gtk.EventBox):
     def __init__(self, surface=None):
-        GObject.GObject.__init__(self)
+        super().__init__()
         self.set_visible_window(False)
+        self.set_app_paintable(True)
         self.area = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0)
         self.add(self.area)
         self.area.show()
@@ -58,14 +62,12 @@ class CairoAppButton(Gtk.EventBox):
         self.connect("size_allocate", self.on_size_allocate)
 
     def update(self, surface=None):
-        a = self.area.get_allocation()
         if surface is not None:
             self.surface = surface
         self.queue_draw()
 
     def on_draw(self, widget, ctx):
         if self.surface is not None:
-            a = self.get_allocation()
             ctx.set_source_surface(self.surface, 0, 0)
             ctx.paint()
             for surface in (self.badge, self.progress_bar):
@@ -234,8 +236,8 @@ class CairoAppButton(Gtk.EventBox):
 class CairoSmallButton(Gtk.Button):
     __gsignals__={"draw": "override"}
     def __init__(self, width, height=None):
-        GObject.GObject.__init__(self)
-        self.set_app_paintable(1)
+        super().__init__()
+        self.set_app_paintable(True)
         if height is None:
             height = width
         self.set_size_request(width, height)
@@ -246,6 +248,7 @@ class CairoSmallButton(Gtk.Button):
         self.connect("button-press-event", self.on_button_press_event)
         self.connect("button-release-event", self.on_button_release_event)
         self.connect("draw", self.on_draw)
+        self.connect("notify::scale-factor", self.on_scale_change)
 
 
     def on_enter_notify_event(self, *args):
@@ -262,7 +265,14 @@ class CairoSmallButton(Gtk.Button):
 
     def on_draw(self, widget, ctx):
         a = self.get_allocation()
-        self.draw_button(ctx, 0, 0, a.width, a.height)
+        sf = self.get_scale_factor()
+        ctx.save()
+        ctx.scale(1 / sf, 1 / sf)
+        self.draw_button(ctx, 0, 0, a.width * sf, a.height * sf)
+        ctx.restore()
+    
+    def on_scale_change(self, *args):
+        self.queue_draw()
 
     def do_draw(self, ctx):
         # This function does nothing and by doing that
@@ -313,19 +323,20 @@ class CairoCloseButton(CairoSmallButton):
                 xc = self.popup_style.get("close_button_x_color",
                                            "#FFFFF")
                 xa = self.popup_style.get("close_button_x_alpha", 0)
+        sf = self.get_scale_factor()
+        r = int(self.popup_style.get("close_button_roundness", 5)) * sf
         if button_source is None:
-            button_source = self.__make_button_surface(self.size, self.size, bgc, bga, xc, xa)
+            button_source = self.__make_button_surface(self.size * sf, self.size * sf, bgc, bga, xc, xa, r)
         if (self.size < w):
-            x = (w - self.size) // 2
+            x = (w - self.size * sf) // 2
         if (self.size < h):
-            y = (h - self.size) // 2
+            y = (h - self.size * sf) // 2
         ctx.set_source_surface(button_source, x, y)
         ctx.paint()
 
-    def __make_button_surface(self, w, h, bgc, bga, xc, xa):
+    def __make_button_surface(self, w, h, bgc, bga, xc, xa, r):
         button_source = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
         bctx = cairo.Context(button_source)
-        r = int(self.popup_style.get("close_button_roundness", 5))
         make_path(bctx, 0, 0, w, h, r)
         red, green, blue = parse_color(bgc)
         alpha = min(max(float(bga) / 100, 0), 1)
@@ -488,7 +499,7 @@ class CairoPopup(Gtk.Window):
         if visual is None:
             visual = gdk_screen.get_system_visual()
         self.set_visual(visual)
-        self.set_app_paintable(1)
+        self.set_app_paintable(True)
         self.globals = Globals()
         self.popup_style = PopupStyle()
         self.popup_type = type_
@@ -794,7 +805,7 @@ class CairoButton(Gtk.EventBox):
     __gsignals__ = {"clicked": (GObject.SIGNAL_RUN_FIRST, None,(int, int, )),}
 
     def __init__(self, label=None, button_type="window_item"):
-        GObject.GObject.__init__(self)
+        super().__init__()
         self.set_visible_window(False)
         self.set_above_child(False)
         self.area = CairoArea(label, button_type)
@@ -867,17 +878,16 @@ class CairoButton(Gtk.EventBox):
 
 class CairoArea(Gtk.Bin):
     def __init__(self, text=None, area_type="window_item"):
+        super().__init__()
         self.type = area_type
         self.text = text
-        Gtk.Bin.__init__(self)
-        GObject.GObject.__init__(self)
         self.popup_style = PopupStyle()
         lrp = int(self.popup_style.get("%s_lr_padding" % self.type,
                                                 5))
         tdp = int(self.popup_style.get("%s_td_padding" % self.type,
                                                 5))
         self.set_padding(tdp, tdp, lrp, lrp)
-        self.set_app_paintable(1)
+        self.set_app_paintable(True)
         self.globals = Globals()
         self.highlighted = False
         self.pressed_down = False
@@ -1088,7 +1098,6 @@ class CairoToggleMenu(Gtk.Box):
 
     def __init__(self, label=None, show_menu=False):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
-        GObject.GObject.__init__(self)
         self.globals = Globals()
 
         self.set_spacing(0)
@@ -1139,8 +1148,7 @@ class CairoVBox(Gtk.Box):
 
     def __init__(self, label=None, show_menu=False):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
-        GObject.GObject.__init__(self)
-        self.set_app_paintable(1)
+        self.set_app_paintable(True)
         self.globals = Globals()
         self.popup_style = PopupStyle()
         self.connect("draw", self.on_draw)
@@ -1162,30 +1170,125 @@ class CairoVBox(Gtk.Box):
         ctx.stroke()
 
 class CairoPreview(Gtk.Image):
-    def __init__(self):
-        GObject.GObject.__init__(self)
-        GLib.timeout_add(100, self.draw)
-        self.connect("visibility-notify-event", self.on_visibility_notify_event)
+    def __init__(self, window):
+        super().__init__()
+        self.window_r = weakref.ref(window)
+        self.globals = Globals()
+        self.last_snapshot = None
+        self.set_app_paintable(True)
         self.connect("draw", self.on_draw)
-
-    def draw(self):
-        if self.get_window() is None:
-            return True
-        a = self.get_allocation()
-        ctx = self.get_window().cairo_create()
-        ctx.rectangle(a.x, a.y, a.width, a.height)
-        ctx.clip()
-        ctx.set_operator(cairo.OPERATOR_SOURCE)
-        ctx.set_source_rgba(1,1,1,0)
-        ctx.paint()
+        self.connect("notify::scale-factor", self.on_scale_changed)
+        self.connect("notify::visible", self.on_visibility_changed)
 
     def on_draw(self, widget, ctx):
-        ctx.set_operator(cairo.OPERATOR_SOURCE)
-        ctx.set_source_rgba(1,1,1,0)
+        window = self.window_r()
+        w, h = self.get_size_request()
+        sf = self.get_scale_factor()
+        pixbuf = self.get_pixbuf(window, w, h, sf)
+        draw_icon = False
+        if pixbuf is None:
+            if self.globals.settings["preview_keep"] and self.last_snapshot is not None:
+                pixbuf = self.last_snapshot
+            else:
+                pixbuf = self.get_icon_pixbuf(window)
+                draw_icon = True
+            pixbuf = CairoMiniIcon.graying_icon(pixbuf)
+        ctx.save()
+        ctx.scale(1 / sf, 1 / sf)
+        if not draw_icon:
+            Gdk.cairo_set_source_pixbuf(ctx, pixbuf, 0, 0)
+        else:
+            Gdk.cairo_set_source_pixbuf(ctx, pixbuf, (w * sf - pixbuf.get_width()) // 2, (h * sf - pixbuf.get_height()) // 2)
         ctx.paint()
+        ctx.restore()
+        return True
 
-    def on_visibility_notify_event(self, *args):
-        self.draw()
+    def on_scale_changed(self, *args):
+        self.queue_draw()
+
+    def on_visibility_changed(self, *args):
+        if self.is_visible():
+            self.queue_draw()
+
+    def get_pixbuf(self, window, w, h, sf):
+        p = XWindowPixbuf(window.xid)
+        pixbuf = p.get_snapshot();
+        if pixbuf is None:
+            return None
+        pixbuf = pixbuf.scale_simple(w * sf, h * sf, GdkPixbuf.InterpType.BILINEAR)
+        if pixbuf is not None and self.globals.settings["preview_keep"]:
+            self.last_snapshot = pixbuf
+        return pixbuf
+
+    def get_icon_pixbuf(self, window):
+        pixbuf = window.wnck.get_icon()
+        sf = self.get_scale_factor()
+        if sf > 1:
+            w = pixbuf.get_width()
+            h = pixbuf.get_height()
+            p = XWindowPixbuf(window.xid).get_icon(max(w, h) * sf)
+            if p is not None:
+                pixbuf = p.scale_simple(w * sf, h * sf, GdkPixbuf.InterpType.BILINEAR)
+        return pixbuf
+
+
+class CairoMiniIcon(Gtk.Image):
+    def __init__(self, window):
+        super().__init__()
+        self.window_r = weakref.ref(window)
+        self.set_app_paintable(True)
+        self.size = 16
+        self.connect("draw", self.on_draw)
+        self.connect("notify::scale-factor", self.on_scale_changed)
+        self.connect("notify::visible", self.on_visibility_changed)
+
+    def on_draw(self, widget, ctx):
+        window = self.window_r()
+        sf = self.get_scale_factor()
+        pixbuf = self._get_icon_pixbuf(window, sf)
+        pb_w = pixbuf.get_width()
+        pb_h = pixbuf.get_height()
+        self.size = max(pb_w, pb_h) // sf
+        if window.wnck.is_minimized():
+            pixbuf = self.graying_icon(pixbuf)
+        ctx.save()
+        ctx.scale(1 / sf, 1 / sf)
+        ah = self.get_allocation().height
+        Gdk.cairo_set_source_pixbuf(ctx, pixbuf, 0, (ah * sf - pb_h) // 2)
+        ctx.paint()
+        ctx.restore()
+        return True
+
+    def on_scale_changed(self, *args):
+        self.queue_draw()
+
+    def on_visibility_changed(self, *args):
+        if self.is_visible():
+            self.queue_draw()
+
+    def get_pixel_size(self):
+        return self.size
+
+    def _get_icon_pixbuf(self, window, sf):
+        pixbuf = window.wnck.get_mini_icon()
+        if sf > 1:
+            w = pixbuf.get_width()
+            h = pixbuf.get_height()
+            p = XWindowPixbuf(window.xid).get_icon(max(w, h) * sf)
+            if p is not None:
+                pixbuf = p.scale_simple(w * sf, h * sf, GdkPixbuf.InterpType.BILINEAR)
+        return pixbuf
+
+    @staticmethod
+    def graying_icon(icon):
+        pixbuf = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, icon.get_width(), icon.get_height())
+        pixbuf.fill(0x00000000)
+        grayed_icon = pixbuf.copy()
+        icon.composite(pixbuf, 0, 0, pixbuf.get_width(), pixbuf.get_height(),
+                       0, 0, 1, 1, GdkPixbuf.InterpType.BILINEAR, 190)
+        pixbuf.saturate_and_pixelate(grayed_icon, 0.12, False)
+        return grayed_icon
+
 
 def make_path(ctx, x=0, y=0, w=0, h=0, r=6, b=0.5,
               arrow_size=0, arrow_direction=None, arrow_position=0):

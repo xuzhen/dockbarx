@@ -22,7 +22,6 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GdkX11
-from gi.repository import GdkPixbuf
 from gi.repository import GLib
 from gi.repository import Pango
 gi.require_version('Wnck', '3.0')
@@ -30,12 +29,9 @@ from gi.repository import Wnck
 import weakref
 import gc
 gc.enable()
-import Xlib
-from PIL import Image
 
 from .common import ODict, Globals, Opacify
 from .common import opacify, deopacify
-from .common import XDisplay
 from .cairowidgets import *
 from .log import logger
 
@@ -222,7 +218,7 @@ class Window():
 
     def update_preview(self):
         self.preview_sid = None
-        self.item.take_preview()
+        self.item.update_preview_image()
 
     #### Opacify
     def opacify(self):
@@ -353,9 +349,7 @@ class WindowItem(CairoButton):
         self.label.set_halign(Gtk.Align.START)
         self.label.set_valign(Gtk.Align.CENTER)
 
-        icon = window.wnck.get_mini_icon()
-        self.icon_image = Gtk.Image()
-        self.icon_image.set_from_pixbuf(icon)
+        self.icon_image = CairoMiniIcon(window)
         self.icon_image.set_margin_start(2)
 
         self.header_box = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4)
@@ -365,7 +359,7 @@ class WindowItem(CairoButton):
 
         vbox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0)
         vbox.pack_start(self.header_box, False, False, 0)
-        self.preview = Gtk.Image()
+        self.preview = CairoPreview(window)
         self.preview.set_halign(Gtk.Align.CENTER)
         self.preview.set_valign(Gtk.Align.CENTER)
         self.preview.set_margin_top(4)
@@ -475,23 +469,8 @@ class WindowItem(CairoButton):
         size += self.icon_image.get_margin_start()
         self.header_box.set_size_request(size, -1)
 
-    def __make_minimized_icon(self, icon):
-        pixbuf = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, icon.get_width(), icon.get_height())
-        pixbuf.fill(0x00000000)
-        minimized_icon = pixbuf.copy()
-        icon.composite(pixbuf, 0, 0, pixbuf.get_width(), pixbuf.get_height(),
-                       0, 0, 1, 1, GdkPixbuf.InterpType.BILINEAR, 190)
-        pixbuf.saturate_and_pixelate(minimized_icon, 0.12, False)
-        return minimized_icon
-
     def __update_icon(self):
-        window = self.window_r()
-        icon = window.wnck.get_mini_icon()
-        if window.wnck.is_minimized():
-            pixbuf = self.__make_minimized_icon(icon)
-            self.icon_image.set_from_pixbuf(pixbuf)
-        else:
-            self.icon_image.set_from_pixbuf(icon)
+        self.icon_image.queue_draw()
 
     def minimized_changed(self):
         window = self.window_r()
@@ -547,49 +526,12 @@ class WindowItem(CairoButton):
         self.preview.set_size_request(width, height)
         return width, height
 
-    def take_preview(self):
-        window = self.window_r()
-        try:
-            xwin = XDisplay.create_resource_object('window', window.xid)
-            # window.wnck.is_minimized() may not work with some wine program windows
-            if xwin.get_wm_state().state != Xlib.Xutil.NormalState:
-                return None
-            xwin.composite_redirect_window(Xlib.ext.composite.RedirectAutomatic)
-            pixmap = xwin.composite_name_window_pixmap()
-            xwin.composite_unredirect_window(Xlib.ext.composite.RedirectAutomatic)
-            geo = xwin.get_geometry()
-            image_object = pixmap.get_image(0, 0, geo.width, geo.height, Xlib.X.ZPixmap, 0xffffffff)
-            pixmap.free()
-        except:
-            return None
-        im = Image.frombuffer("RGBX", (geo.width, geo.height), image_object.data, "raw", "BGRX").convert("RGB")
-        data = im.tobytes()
-        data = GLib.Bytes.new(data)
-        pixbuf = GdkPixbuf.Pixbuf.new_from_bytes(data, GdkPixbuf.Colorspace.RGB, False, 8, geo.width, geo.height, geo.width * 3)
-        w, h = self.preview.get_size_request()
-        pixbuf = pixbuf.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
-        if self.globals.settings["preview_keep"]:
-            self.last_preview = pixbuf
-        return pixbuf
-
     def set_show_preview(self, show_preview):
-        if show_preview:
-            if self.group_r().popup.popup_showing:
-                self.set_preview_image()
-            self.preview.show()
-        else:
-            self.preview.hide()
+        self.preview.set_visible(show_preview)
         self.__set_label_size()
 
-    def set_preview_image(self):
-        pixbuf = self.take_preview()
-        if pixbuf is not None:
-            self.preview.set_from_pixbuf(pixbuf)
-        elif self.globals.settings["preview_keep"] and (self.last_preview is not None):
-            self.preview.set_from_pixbuf(self.last_preview)
-        else:
-            window = self.window_r()
-            self.preview.set_from_pixbuf(window.wnck.get_icon())
+    def update_preview_image(self):
+        self.preview.queue_draw()
 
     #### Events
     def on_enter_notify_event(self, widget, event):

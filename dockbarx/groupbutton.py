@@ -2204,7 +2204,7 @@ class GroupPopup(CairoPopup):
         # Prepare window preview so they are ready when the popup is shown.
         if self.get_child_() == group.window_list and group.window_list.show_previews:
             for window in group:
-                GLib.idle_add(window.item.set_preview_image)
+                GLib.idle_add(window.item.update_preview_image)
         if not delay:
             # No delay, show it now.
             self.__show(force)
@@ -2218,7 +2218,7 @@ class GroupPopup(CairoPopup):
         group = self.group_r()
         if self.get_child_() == group.window_list and group.window_list.show_previews:
             for window in group:
-                GLib.idle_add(window.item.set_preview_image)
+                GLib.idle_add(window.item.update_preview_image)
         self.__show(force)
 
     def __show(self, force=False):
