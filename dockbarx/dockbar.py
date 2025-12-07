@@ -448,10 +448,12 @@ class GroupList(list):
                 if allocation.height > size:
                     allocation.height = size
                     widget.size_allocate(allocation)
+                    return
             else:
                 if allocation.width > size:
                     allocation.width = size
                     widget.size_allocate(allocation)
+                    return
         self.calculate_button_size()
         self.manage_size_overflow()
 

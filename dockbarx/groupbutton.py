@@ -501,6 +501,9 @@ class Group(ListOfWindows):
         for label in labels:
             label.set_ellipsize(mode)
 
+    def get_scale_factor(self):
+        return self.monitor.get_scale_factor()
+
     #### Opacify
     def opacify(self, delay=0):
         if delay:
@@ -1543,8 +1546,9 @@ class GroupButton(CairoAppButton):
             surface = self.icon_factory.surface_update(state_type, force_update=force_update)
             self.state_type = state_type
             # Set the button size to the size of the surface
-            width = surface.get_width()
-            height = surface.get_height()
+            sf = self.get_scale_factor()
+            width = surface.get_width() // sf
+            height = surface.get_height() // sf
             if self.get_allocation().width !=  width or \
                self.get_allocation().height != height:
                 self.set_size_request(width, height)
@@ -1915,7 +1919,7 @@ class GroupButton(CairoAppButton):
         # Sends the new size to icon_factory so that a new icon in the right
         # size can be found. The icon is then updated.
         CairoAppButton.on_size_allocate(self, widget, allocation)
-        if self.old_alloc == self.get_allocation():
+        if self.old_alloc == allocation:
             return
         if not self.manual_size:
             # Let's update the size of the icons

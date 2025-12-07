@@ -46,6 +46,7 @@ class CairoAppButton(Gtk.EventBox):
         self.set_visible_window(False)
         self.set_app_paintable(True)
         self.area = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0)
+        self.area.set_app_paintable(True)
         self.add(self.area)
         self.area.show()
         self.globals = Globals()
@@ -68,12 +69,16 @@ class CairoAppButton(Gtk.EventBox):
 
     def on_draw(self, widget, ctx):
         if self.surface is not None:
+            sf = self.get_scale_factor()
+            ctx.save()
+            ctx.scale(1 / sf, 1 / sf)
             ctx.set_source_surface(self.surface, 0, 0)
             ctx.paint()
             for surface in (self.badge, self.progress_bar):
                 if surface is not None:
                     ctx.set_source_surface(surface, 0, 0)
                     ctx.paint()
+            ctx.restore()
 
     def on_size_allocate(self, widget, allocation):
         if self.badge:
@@ -88,6 +93,9 @@ class CairoAppButton(Gtk.EventBox):
             return
         self.badge_text = text
         a = self.area.get_allocation()
+        sf = self.get_scale_factor()
+        a.width *= sf
+        a.height *= sf
         self.badge = cairo.ImageSurface(cairo.FORMAT_ARGB32, a.width, a.height)
         ctx = cairo.Context(self.badge)
         layout = PangoCairo.create_layout(ctx)
@@ -152,6 +160,9 @@ class CairoAppButton(Gtk.EventBox):
             return
         self.progress = progress
         a = self.area.get_allocation()
+        sf = self.get_scale_factor()
+        a.width *= sf
+        a.height *= sf
         x = max(0.1 * a.width, 2)
         y = max(0.15 * a.height, 3)
         w = min(max (0.60 * a.width, 20), a.width - 2 * x)

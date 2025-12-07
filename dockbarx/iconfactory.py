@@ -72,6 +72,7 @@ class IconFactory():
     def __init__(self, group, class_group=None,
                  desktop_entry=None, identifier=None, size=None):
         self.dockbar_r = weakref.ref(group.dockbar_r())
+        self.group_r = weakref.ref(group)
         self.theme = Theme()
         self.globals = Globals()
         self.globals_event = self.globals.connect("color-changed", self.reset_surfaces)
@@ -172,7 +173,6 @@ class IconFactory():
             del self.temp
             gc.collect()
         if dnd:
-            print
             surface = self.__dd_highlight(surface, is_vertical, dnd)
             gc.collect()
         return surface
@@ -446,12 +446,13 @@ class IconFactory():
         return surface
 
     def __command_pixmap(self, surface, name, content=None, size=None):
+        sf = self.group_r().get_scale_factor()
         if size is not None:
             # TODO: Fix for different height and width
             w = h = int(round(self.__get_use_size() + \
-                              self.__process_size(size)))
+                              self.__process_size(size))) * sf
         elif surface is None:
-            w = h = int(round(self.__get_use_size()))
+            w = h = int(round(self.__get_use_size())) * sf
         else:
             w = surface.get_width()
             h = surface.get_height()
@@ -472,7 +473,8 @@ class IconFactory():
 
     #### Get icon
     def __command_get_icon(self,surface=None, size="0"):
-        size = int(self.__get_use_size() + self.__process_size(size))
+        sf = self.group_r().get_scale_factor()
+        size = int(self.__get_use_size() + self.__process_size(size)) * sf
         if size <= 0:
             # To avoid crashes.
             size = 15
@@ -603,13 +605,14 @@ class IconFactory():
 
     #### Other commands
     def __command_clear(self, surface):
+        sf = self.group_r().get_scale_factor()
         if self.dockbar_r().orient in ("left", "right"):
             w = self.size
             h = int(self.size * self.ar)
         else:
             w = int(self.size * self.ar)
             h = self.size
-        new = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+        new = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * sf, h * sf)
         ctx = cairo.Context(new)
         ctx.set_source_rgba(0, 0, 0)
         ctx.set_operator(cairo.OPERATOR_SOURCE)
@@ -618,12 +621,15 @@ class IconFactory():
 
     def __command_get_pixmap(self, surface, name):
         if surface is None:
+            sf = self.group_r().get_scale_factor()
             if self.dockbar_r().orient in ("left", "right"):
                 width = self.size
                 height = int(self.size * self.ar)
             else:
                 width = int(self.size * self.ar)
                 height = self.size
+            width = width * sf
+            height = height * sf
         else:
             width = surface.get_width()
             height = surface.get_height()
@@ -832,10 +838,13 @@ class IconFactory():
         else:
             width = int(self.size * self.ar)
             height = self.size
+        sf = self.group_r().get_scale_factor()
+        width = width * sf
+        height = height * sf
         if surface.get_width() == width and surface.get_height() == height:
             return surface
-        woffset = round((width - surface.get_width()) / 2.0)
-        hoffset = round((height - surface.get_height()) / 2.0)
+        woffset = (width - surface.get_width()) / 2.0
+        hoffset = (height - surface.get_height()) / 2.0
         new = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
         ctx = cairo.Context(new)
         ctx.set_source_surface(surface, woffset, hoffset)
