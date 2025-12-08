@@ -1456,6 +1456,7 @@ class GroupButton(CairoAppButton):
         self.connect("button-press-event", self.on_button_press_event)
         self.connect("scroll-event", self.on_scroll_event)
         self.connect("size-allocate", self.on_size_allocate)
+        self.connect("notify::scale-factor", self.on_scale_changed)
         self.connect("drag-motion", self.on_drag_motion)
         self.connect("drag-leave", self.on_drag_leave)
         self.connect("drag-drop", self.on_drag_drop)
@@ -1928,6 +1929,11 @@ class GroupButton(CairoAppButton):
         self.old_alloc = allocation
         # Update icon geometry
         self.set_icongeo()
+
+    def on_scale_changed(self, *args):
+        # button size should be recalculated
+        self.icon_factory.reset_surfaces()
+        self.update_state(force_update=True)
 
     def __reset_locked_popup_position(self):
         group = self.group_r()

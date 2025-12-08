@@ -259,7 +259,7 @@ class CairoSmallButton(Gtk.Button):
         self.connect("button-press-event", self.on_button_press_event)
         self.connect("button-release-event", self.on_button_release_event)
         self.connect("draw", self.on_draw)
-        self.connect("notify::scale-factor", self.on_scale_change)
+        self.connect("notify::scale-factor", self.on_scale_changed)
 
 
     def on_enter_notify_event(self, *args):
@@ -282,8 +282,9 @@ class CairoSmallButton(Gtk.Button):
         self.draw_button(ctx, 0, 0, a.width * sf, a.height * sf)
         ctx.restore()
     
-    def on_scale_change(self, *args):
-        self.queue_draw()
+    def on_scale_changed(self, *args):
+        if self.is_visible():
+            self.queue_draw()
 
     def do_draw(self, ctx):
         # This function does nothing and by doing that
@@ -532,6 +533,7 @@ class CairoPopup(Gtk.Window):
         self.connect("draw", self.on_draw)
         self.connect("enter-notify-event", self.on_enter_notify_event)
         self.connect("leave-notify-event", self.on_leave_notify_event)
+        self.connect("notify::scale-factor", self.on_scale_changed)
         self.popup_reloaded_sid = self.popup_style.connect(
                                                 "popup-style-reloaded",
                                                 self.__on_popup_style_reloaded)
@@ -583,6 +585,12 @@ class CairoPopup(Gtk.Window):
         ctx.paint()
         ctx.set_operator(cairo.OPERATOR_OVER)
         self.draw_frame(ctx, w, h)
+
+    def on_scale_changed(self, *args):
+        # from 1x to 2x, some ctx became broken
+        # self.queue_draw() did not help
+        if self.get_realized():
+            self.unrealize()
 
     def update_shape(self):
         if self.globals.settings["shape_mask"]:
@@ -1215,7 +1223,8 @@ class CairoPreview(Gtk.Image):
         return True
 
     def on_scale_changed(self, *args):
-        self.queue_draw()
+        if self.is_visible():
+            self.queue_draw()
 
     def on_visibility_changed(self, *args):
         if self.is_visible():
@@ -1271,7 +1280,8 @@ class CairoMiniIcon(Gtk.Image):
         return True
 
     def on_scale_changed(self, *args):
-        self.queue_draw()
+        if self.is_visible():
+            self.queue_draw()
 
     def on_visibility_changed(self, *args):
         if self.is_visible():

@@ -554,6 +554,7 @@ class DockX(CairoDockX):
         screen = Gdk.Screen.get_default()
         screen.connect("size-changed", self.__on_screen_size_changed)
         self.connect("size-allocate", self.on_size_allocate)
+        self.connect("notify::scale-factor", self.on_scale_change)
         if self.autohide:
             self.show_dock()
         self.__on_layer_changed()
@@ -934,6 +935,9 @@ class DockX(CairoDockX):
         if self.globals.settings["dock/mode"] != "panel":
             self.__set_dock_strut(x, y, w, h)
         self.dockbar.dockbar_moved()
+
+    def on_scale_change(self, *args):
+        self.position_dock()
 
     def show_dock(self):
         self.show()
