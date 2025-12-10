@@ -2368,6 +2368,7 @@ class LockedPopup(GroupPopup):
         self.overlap_sid = self.globals.connect("locked-list-overlap-changed", self.__set_own_strut)
         self.size_allocate_sid = self.connect("size-allocate", self.on_size_allocate)
         self.connect("realize", self.__on_realized)
+        self.connect("notify::scale-factor", self.__on_scale_changed)
 
     def show(self):
         CairoPopup.show_all(self)
@@ -2477,6 +2478,12 @@ class LockedPopup(GroupPopup):
     def __on_realized(self, widget):
         self.get_window().set_override_redirect(False)
         self.__set_own_strut()
+
+    def __on_scale_changed(self, *args):
+        if self.is_visible():
+            # relocate
+            self.hide()
+            self.show()
 
     def destroy(self):
         group = self.group_r()
