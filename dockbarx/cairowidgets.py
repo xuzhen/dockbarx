@@ -591,6 +591,7 @@ class CairoPopup(Gtk.Window):
         # self.queue_draw() did not help
         if self.get_realized():
             self.unrealize()
+            self.realize()
 
     def update_shape(self):
         if self.globals.settings["shape_mask"]:
