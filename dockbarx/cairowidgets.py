@@ -1204,13 +1204,16 @@ class CairoPreview(Gtk.Image):
         window = self.window_r()
         w, h = self.get_size_request()
         sf = self.get_scale_factor()
-        pixbuf = self.get_pixbuf(window, w, h, sf)
+        w, h = w * sf, h * sf
+        pixbuf = self.get_pixbuf(window, w, h)
         draw_icon = False
         if pixbuf is None:
             if self.globals.settings["preview_keep"] and self.last_snapshot is not None:
                 pixbuf = self.last_snapshot
+                if pixbuf.get_width() != w or pixbuf.get_height() != h:
+                    pixbuf = pixbuf.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
             else:
-                pixbuf = self.get_icon_pixbuf(window)
+                pixbuf = self.get_icon_pixbuf(window, sf)
                 draw_icon = True
             pixbuf = CairoMiniIcon.graying_icon(pixbuf)
         ctx.save()
@@ -1218,7 +1221,7 @@ class CairoPreview(Gtk.Image):
         if not draw_icon:
             Gdk.cairo_set_source_pixbuf(ctx, pixbuf, 0, 0)
         else:
-            Gdk.cairo_set_source_pixbuf(ctx, pixbuf, (w * sf - pixbuf.get_width()) // 2, (h * sf - pixbuf.get_height()) // 2)
+            Gdk.cairo_set_source_pixbuf(ctx, pixbuf, (w - pixbuf.get_width()) // 2, (h - pixbuf.get_height()) // 2)
         ctx.paint()
         ctx.restore()
         return True
@@ -1231,19 +1234,18 @@ class CairoPreview(Gtk.Image):
         if self.is_visible():
             self.queue_draw()
 
-    def get_pixbuf(self, window, w, h, sf):
+    def get_pixbuf(self, window, w, h):
         p = XWindowPixbuf(window.xid)
         pixbuf = p.get_snapshot();
         if pixbuf is None:
             return None
-        pixbuf = pixbuf.scale_simple(w * sf, h * sf, GdkPixbuf.InterpType.BILINEAR)
+        pixbuf = pixbuf.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
         if pixbuf is not None and self.globals.settings["preview_keep"]:
             self.last_snapshot = pixbuf
         return pixbuf
 
-    def get_icon_pixbuf(self, window):
+    def get_icon_pixbuf(self, window, sf):
         pixbuf = window.wnck.get_icon()
-        sf = self.get_scale_factor()
         if sf > 1:
             w = pixbuf.get_width()
             h = pixbuf.get_height()
