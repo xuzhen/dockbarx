@@ -498,7 +498,7 @@ class IconFactory():
             pbs = pb.scale_simple(w, h, GdkPixbuf.InterpType.BILINEAR)
             woffset = round((size - w) / 2.0)
             hoffset = round((size - h) / 2.0)
-            Gdk.cairo_set_source_pixbuf(ctx, pb, woffset, hoffset)
+            Gdk.cairo_set_source_pixbuf(ctx, pbs, woffset, hoffset)
             ctx.paint()
             del pb
             del pbs
