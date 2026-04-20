@@ -2345,6 +2345,10 @@ class PrefApp(Gtk.Application):
         if not self.window:
             self.window = PrefDialog(self)
             self.add_window(self.window.dialog)
-            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, self.window.dialog_close)
+            if GLib.check_version(2, 80, 0) is None:
+                from gi.repository import GLibUnix
+                GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, self.window.dialog_close)
+            else:
+                GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, self.window.dialog_close)
 
 PrefApp().run(sys.argv)
