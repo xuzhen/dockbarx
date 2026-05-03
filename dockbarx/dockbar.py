@@ -901,6 +901,8 @@ class DockBar():
             group.set_active_window(None)
         # Activate new windowbutton
         active_window = screen.get_active_window()
+        if active_window == None:
+            active_window = previous_active_window
         if active_window in self.windows:
             active_group_name = self.windows[active_window]
             active_group = self.groups[active_group_name]
