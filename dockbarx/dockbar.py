@@ -494,6 +494,8 @@ class DockBar():
         self.keyboard_show_dock = False
         self.no_theme_change_reload = False
         self.no_dbus_reload = False
+        # True while reload() is tearing the dock down and building it up again.
+        self.reloading = False
         self.orient = "down"
 
         self.globals = Globals()
@@ -588,6 +590,12 @@ class DockBar():
     def reload(self, event=None, data=None, tell_parent=True, locked_group=None):
         """Reloads DockbarX."""
         logger.info("DockbarX reload")
+        # Don't save the launcher list while reloading. Tearing down the old
+        # group buttons triggers update_pinned_apps_list(), which would write
+        # the list that is about to be discarded over the one this reload is
+        # just about to read -- losing any launchers set from the outside
+        # while the dock was running.
+        self.reloading = True
         # Clear away the old stuff, if any.
         if self.windows:
             # Remove windows and unpinned group buttons
@@ -653,6 +661,7 @@ class DockBar():
                 identifier = None
             self.__add_launcher(identifier, path)
         # Update pinned_apps list to remove any pinned_app that are faulty.
+        self.reloading = False
         self.update_pinned_apps_list()
 
         #--- Initiate windows
@@ -1535,6 +1544,8 @@ class DockBar():
 
     def update_pinned_apps_list(self, arg=None):
         # Saves pinned_apps_list
+        if self.reloading:
+            return
         pinned_apps = []
         for group in self.groups:
             if not group.pinned:
