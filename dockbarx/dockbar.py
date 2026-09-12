@@ -588,14 +588,25 @@ class DockBar():
     def reload(self, event=None, data=None, tell_parent=True, locked_group=None):
         """Reloads DockbarX."""
         logger.info("DockbarX reload")
+        # Drop the screen signal handlers this reload is about to replace.
+        # They are connected here on every reload, but Wnck.Screen outlives
+        # the dock, so without this each reload leaves another set behind:
+        # every window event then runs all of them, the stale ones raising
+        # on state that has been torn down, until the dock is burning CPU
+        # and stops answering at all.
+        disconnect(self.screen)
         # Clear away the old stuff, if any.
         if self.windows:
             # Remove windows and unpinned group buttons
             for win in self.screen.get_windows():
                 self.__on_window_closed(None, win)
-        # Remove pinned group buttons
+        # Remove pinned group buttons. Iterate over a copy: GroupList is a
+        # list, and removing from the list being iterated skips every other
+        # group. The skipped ones never get destroy()ed, so the handlers they
+        # hold on the globals singleton -- which outlives them -- are never
+        # disconnected, and every reload leaves another batch behind.
         if self.groups is not None:
-            for group in self.groups:
+            for group in list(self.groups):
                 self.groups.remove(group)
                 group.destroy()
             self.groups.destroy()
@@ -666,14 +677,14 @@ class DockBar():
                     group.add_locked_popup()
                     break
 
-        self.screen.connect("window-opened", self.__on_window_opened)
-        self.screen.connect("window-closed", self.__on_window_closed)
-        self.screen.connect("active-window-changed",
-                            self.__on_active_window_changed)
-        self.screen.connect("viewports-changed",
-                            self.__on_desktop_changed)
-        self.screen.connect("active-workspace-changed",
-                            self.__on_desktop_changed)
+        connect(self.screen, "window-opened", self.__on_window_opened)
+        connect(self.screen, "window-closed", self.__on_window_closed)
+        connect(self.screen, "active-window-changed",
+                self.__on_active_window_changed)
+        connect(self.screen, "viewports-changed",
+                self.__on_desktop_changed)
+        connect(self.screen, "active-workspace-changed",
+                self.__on_desktop_changed)
 
         self.__on_active_window_changed(self.screen, None)
         # Since the old container is destroyed we need to tell
